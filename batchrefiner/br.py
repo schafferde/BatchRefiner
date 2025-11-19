@@ -20,16 +20,16 @@ def batchrefine(embed, batch_labels, mode="scale", metric="pcr", keep_scores=Fal
     metric : str | callable, optional
         Metric for scoring dimensions. PCR Comparison ("pcr", default) and iLISI ("ilisi") are implemented using scib. 
         Otherwise, a user-supplied funciton is used. The function must take an embedding, an array of batch labels, 
-         and a dictionary of kwargs as its arguments.
+        and optionally additional kwargs. 
     keep_scores : bool, optional
         If True, returns scores (dimensions,) along with the results.
     filter_dims : bool, optional
-        In "filter" mode, number of dinemsions to kepp. Defaults to 50.
+        In "filter" mode, number of dimemsions to keep. Defaults to 50.
     n_proc : int, optional
         Number of parallel processes to use for scoring dimensions. 
         Defaults to 8; -1 will specify the number of available CPUs.
     **kwargs : dict
-        Additional arguments to be passed to the dimension scoring function, such as n_cores for internal parallelization of iLISI.
+        Additional arguments to be passed to the dimension scoring function, such as n_neighbors for iLISI.
 
     Returns
     -------
@@ -108,21 +108,22 @@ def batchrefine_scanpy(adata, emb_key, batch_key="batch", br_key="X_BatchRefiner
         BatchRefiner mode to use. Defaults to "scale"; "filter" is also supported.
     metric : str | callable, optional
         Metric for scoring dimensions. PCR Comparison ("pcr", default) and iLISI ("ilisi") are implemented using scib. 
-        Otherwise, a user-supplied funciton is used. The function must take an embedding and an array of batch labels as its first two arguments.
+        Otherwise, a user-supplied funciton is used. The function must take an embedding, an array of batch labels, 
+        and optionally additional kwargs. 
     br_key : 
         Key to save BatchRefiner-modified embeddings in adata.obsm. 
         These will have shape (cells, dimensions) in "scale" mode or (cells, filter_dims) in "filter" mode.
     score_key : str, optional
         Key to save the scores, with shape (dimensions,), in adata.uns. Default is to not save scores.
     filter_dims : int, optional
-        In "filter" mode, number of dinemsions to kepp. Defaults to 50.
+        In "filter" mode, number of dimemsions to keep. Defaults to 50.
     n_proc : int, optional
         Number of parallel processes to use for scoring dimensions.
         Defaults to 8; -1 will specify the number of available CPUs.
     copy : bool, optional
         If True, copy the AnnData object instead of (default) modifying in place.
     **kwargs : dict
-        Additional arguments to be passed to the dimension scoring function, such as n_cores for internal parallelization of iLISI.
+        Additional arguments to be passed to the dimension scoring function, such as n_neighbors for iLISI.
 
     Returns
     -------

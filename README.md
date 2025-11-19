@@ -1,6 +1,6 @@
 # BatchRefiner
-BatchRefiner is a general postprocessing tool to boost batch integration of scRNA-seq cell embeddings. ...
-It is implemented in Python.
+BatchRefiner is a general postprocessing tool to boost batch integration of scRNA-seq cell embeddings. It uses metrics of batch inetegration to score individual dimensions of an embedding, and then down-weights (scales) or filters out embeddings with a high batch signal (poor score). It is implemented in Python.
+
 ## Installation
 
 BatchRefiner can be installed from GitHub
@@ -21,11 +21,10 @@ BatchRefiner requires the following packages:
 * anndata
 * scanpy
 * [scib](https://github.com/theislab/scib)
-* [multiprocess](https://github.com/uqfoundation/multiprocess)
 
 
 ## Example
-An example workflow using BatchRefiner in provided in `example/example_pancreas.ipynb`. Here, we use PCR Comparison to scale PCA embeddings of a small dataset. The dataset includes log-nromalized expression data of pancreatic alpha and beta cells from five batches. These data were normalized and then subset from a [larger dataset](https://zenodo.org/records/7968485) (Hie et al., 2024). The subset dataset is also found in `example`.
+An example workflow using BatchRefiner is provided in `example/example_pancreas.ipynb`. Here, we use PCR Comparison to scale PCA embeddings of a small dataset. The dataset includes log-normalized expression data of 8469 pancreatic alpha and beta cells from five batches. These data were normalized and then subset from a [larger dataset](https://zenodo.org/records/7968485) (Hie et al., 2024). The subset dataset is also found in `example/`.
 
 ## Usage
 BatchRefiner postprocesses an existing cell embedding. This package supports directly imputting matrices or providing an AnnData object, used by Scanpy.
@@ -40,7 +39,7 @@ batch_labels = ... #shape: (cells, )
 
 #Run BatchRefiner
 scaled_pca = batchrefine(embed, batch_labels, mode="scale", metric="pcr")
-filtered_ilisi = batchrefine(embed, batch_labels, mode="filter", metric="ilisi", n_cores=10)
+filtered_ilisi = batchrefine(embed, batch_labels, mode="filter", metric="ilisi", n_proc=-1)
 ```
 The docstring provides all options, including parallelism (``n_proc``), custom scoring functions (``metric=callable``), and saving scores (``keep_scores``)
 ```
@@ -57,16 +56,17 @@ The docstring provides all options, including parallelism (``n_proc``), custom s
         BatchRefiner mode to use. Defaults to "scale"; "filter" is also supported.
     metric : str | callable, optional
         Metric for scoring dimensions. PCR Comparison ("pcr", default) and iLISI ("ilisi") are implemented using scib. 
-        Otherwise, a user-supplied funciton is used. The function must take an embedding and an array of batch labels as its first two arguments.
+        Otherwise, a user-supplied funciton is used. The function must take an embedding, an array of batch labels, 
+        and optionally additional kwargs. 
     keep_scores : bool, optional
         If True, returns scores (dimensions,) along with the results.
     filter_dims : bool, optional
-        In "filter" mode, number of dinemsions to kepp. Defaults to 50.
+        In "filter" mode, number of dimemsions to keep. Defaults to 50.
     n_proc : int, optional
         Number of parallel processes to use for scoring dimensions. 
         Defaults to 8; -1 will specify the number of available CPUs.
     **kwargs : dict
-        Additional arguments to be passed to the dimension scoring function, such as n_cores for internal parallelization of iLISI.
+        Additional arguments to be passed to the dimension scoring function, such as n_neighbors for iLISI.
 
     Returns
     -------
@@ -92,7 +92,7 @@ adata = ad.AnnData(X=None, obs={"batch":batch_labels}, obsm={"X_emb":embed}, sha
 def batchrefine_scanpy(adata, emb_key, batch_key="batch", br_key="X_BatchRefiner", score_key=None, copy=False, **kwargs):
 
 batchrefine_scanpy(adata, "X_emb", batch_key="batch", br_key = "X_emb_scale_pcr", mode="scale", metric="pcr")
-batchrefine_scanpy(adata, "X_emb", batch_key="batch", br_key="X_emb_filter_ilisi", mode="filter", metric="ilisi", n_cores=10)
+batchrefine_scanpy(adata, "X_emb", batch_key="batch", br_key="X_emb_filter_ilisi", mode="filter", metric="ilisi", n_proc=-1)
 ```
 The complete set of parameters are very similar to `batchrefine`, with arrays swapped for keys in AnnData fields. 
 ```
@@ -111,21 +111,22 @@ The complete set of parameters are very similar to `batchrefine`, with arrays sw
         BatchRefiner mode to use. Defaults to "scale"; "filter" is also supported.
     metric : str | callable, optional
         Metric for scoring dimensions. PCR Comparison ("pcr", default) and iLISI ("ilisi") are implemented using scib. 
-        Otherwise, a user-supplied funciton is used. The function must take an embedding and an array of batch labels as its first two arguments.
+        Otherwise, a user-supplied funciton is used. The function must take an embedding, an array of batch labels, 
+        and optionally additional kwargs. 
     br_key : 
         Key to save BatchRefiner-modified embeddings in adata.obsm. 
         These will have shape (cells, dimensions) in "scale" mode or (cells, filter_dims) in "filter" mode.
     score_key : str, optional
         Key to save the scores, with shape (dimensions,), in adata.uns. Default is to not save scores.
     filter_dims : int, optional
-        In "filter" mode, number of dinemsions to kepp. Defaults to 50.
+        In "filter" mode, number of dimemsions to keep. Defaults to 50.
     n_proc : int, optional
         Number of parallel processes to use for scoring dimensions. 
         Defaults to 8; -1 will specify the number of available CPUs.
     copy : bool, optional
         If True, copy the AnnData object instead of (default) modifying in place.
     **kwargs : dict
-        Additional arguments to be passed to the dimension scoring function, such as n_cores for internal parallelization of iLISI.
+        Additional arguments to be passed to the dimension scoring function, such as n_neighbors for iLISI.
 
     Returns
     -------
@@ -145,7 +146,7 @@ If you encounter the following error:
 ```
 AssertionError: daemonic processes are not allowed to have children
 ```
-This is likely because both `n_proc` (number of processes used by BatchRefiner) and `n_cores` (number of processes used internally by scib's LISI) are greater than one. Unfortinately, parallelism is only supported at one level, so set one of those arguments to be 1. It is suggested to set `n_proc=-1` and `n_cores=1` for a higher level of parallelism. 
+This is likely because both `n_proc` (number of processes used by BatchRefiner) and `n_cores` (number of processes used internally by scib's LISI) are greater than one. Unfortinately, parallelism is only supported at one level, so one of those arguments must be 1 (their default). It is suggested to set `n_proc=-1` and `n_cores=1` for a higher level of parallelism. 
 
 ## References
 Schäffer, D. E, Kang, H., Aksu, E. D., Edelman, D., Berger, B.: Improving batch integration of scRNA-seq cell embeddings
