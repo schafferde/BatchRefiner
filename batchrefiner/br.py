@@ -2,10 +2,11 @@ import os
 import warnings
 from multiprocessing import Pool
 import numpy as np
-from functools import partial
+import pandas as pd
+from functools import partial 
 
 
-def batchrefine(embed, batch_labels, mode="scale", metric="pcr", keep_scores=False, filter_dims=50, n_proc=8, **kwargs):
+def batchrefine(embed, batch_labels, mode="scale", metric="r2", keep_scores=False, filter_dims=None, filter_thresh=None, n_proc=8, **kwargs):
     """
     Apply BatchRefiner to an embedding
 
@@ -16,15 +17,17 @@ def batchrefine(embed, batch_labels, mode="scale", metric="pcr", keep_scores=Fal
     batch_labels : numpy.ndarray | list | ...
         Batch labels of shape (cells, ).
     mode : str, optional
-        BatchRefiner mode to use. Defaults to "scale"; "filter" is also supported.
+        BatchRefiner mode to use. Defaults to "scale"; "filter" or "scale" are also supported.
     metric : str | callable, optional
-        Metric for scoring dimensions. PCR Comparison ("pcr", default) and iLISI ("ilisi") are implemented using scib. 
+        Metric for scoring dimensions. Batch R^2 ("r2", default) and iLISI ("ilisi") are implemented using scib. 
         Otherwise, a user-supplied funciton is used. The function must take an embedding, an array of batch labels, 
-        and optionally additional kwargs. 
+        and optionally additional kwargs. It should return a higher score for columns with more batch signal.
     keep_scores : bool, optional
         If True, returns scores (dimensions,) along with the results.
-    filter_dims : bool, optional
-        In "filter" mode, number of dimemsions to keep. Defaults to 50.
+    filter_dims : int, optional
+        In "filter" mode, number of dimemsions to keep. 
+    filter_thresh : float, optional
+        In "filter" mode, (maximum) score threshold to use. 
     n_proc : int, optional
         Number of parallel processes to use for scoring dimensions. 
         Defaults to 8; -1 will specify the number of available CPUs.
@@ -53,14 +56,14 @@ def batchrefine(embed, batch_labels, mode="scale", metric="pcr", keep_scores=Fal
     if callable(metric):
         #Using user-supplied benchmarking function.
         score_fn = metric
-    elif metric == "pcr":
-        from .pcr_score import pcr_score
-        score_fn = pcr_score
+    elif metric == "r2":
+        from .r2_score import r2_score
+        score_fn = r2_score
     elif metric == "ilisi":
         from .ilisi_score import ilisi_score
         score_fn = ilisi_score
     else:
-        raise ValueError(f"Invalid metric {metric} specified. Supported modes are 'pcr', 'ilisi', or a user-provided function.")
+        raise ValueError(f"Invalid metric {metric} specified. Supported modes are 'r2', 'ilisi', or a user-provided function.")
         
     partial_score = partial(score_fn, batch_labels=batch_labels, **kwargs)
     dimensions = [embed[:,i].reshape(-1,1) for i in range(n_dims)]
@@ -79,13 +82,42 @@ def batchrefine(embed, batch_labels, mode="scale", metric="pcr", keep_scores=Fal
 
     #BatchRefiner
     if mode == "scale":
+        scores = -scores #Flip so a higher score is better
         scores -= np.min(scores)
         max_val = np.max(scores)
         scores /= max_val if max_val > 0 else 1 #Becomes a no-op if all the same
         result = embed * scores
-    else:
-        columns = np.argpartition(scores, -filter_dims)[-filter_dims:]
+
+    elif mode == "filter":
+        if filter_dims is not None:
+            try:
+                filter_dims = int(filter_dims)
+                #We want to keep lower-scoring dimensions
+                columns = np.argpartition(scores, filter_dims)[:filter_dims]
+            except (ValueError, TypeError):
+                warnings.warn(f"Unable to interpret {filter_dims} as an integer number of columns", UserWarning, stacklevel=2)
+        elif filter_thresh is not None:
+            try:
+                filter_thresh = float(filter_dims)
+                columns = scores < filter_thresh
+                print(f"Keeping {np.sum(columns)} after filtering")
+            except (ValueError, TypeError):
+                warnings.warn(f"Unable to interpret {filter_dims} as a numerical score threshold", UserWarning, stacklevel=2)
+        else:
+            warnings.warn(f"In filter mode, but neither dimensions nor threshold provided", UserWarning, stacklevel=2)
+            columns = np.ones(n_dims)
         result = embed[:,columns]
+
+    elif mode == "center":
+        scores -= np.min(scores)
+        max_val = np.max(scores)
+        scores /= max_val if max_val > 0 else 1
+        category_means = pd.DataFrame(embed).groupby(batch_labels).transform('mean').values
+        result = embed - (scores * category_means)
+
+    else:
+        warnings.warn(f"Unrecognized mode: {mode}", UserWarning, stacklevel=2)
+        result = embed
     
     if keep_scores:
         return (result, scores)
@@ -105,18 +137,20 @@ def batchrefine_scanpy(adata, emb_key, batch_key="batch", br_key="X_BatchRefiner
     batch_labels : str, optional
         Key of the batch labels in adata.obs. Default is "batch".
     mode : str, optional
-        BatchRefiner mode to use. Defaults to "scale"; "filter" is also supported.
+        BatchRefiner mode to use. Defaults to "scale"; "filter" or "scale" are also supported.
     metric : str | callable, optional
-        Metric for scoring dimensions. PCR Comparison ("pcr", default) and iLISI ("ilisi") are implemented using scib. 
+        Metric for scoring dimensions. Batch R^2 ("r2", default) and iLISI ("ilisi") are implemented using scib. 
         Otherwise, a user-supplied funciton is used. The function must take an embedding, an array of batch labels, 
-        and optionally additional kwargs. 
+        and optionally additional kwargs. It should return a higher score for columns with more batch signal.
     br_key : 
         Key to save BatchRefiner-modified embeddings in adata.obsm. 
         These will have shape (cells, dimensions) in "scale" mode or (cells, filter_dims) in "filter" mode.
     score_key : str, optional
         Key to save the scores, with shape (dimensions,), in adata.uns. Default is to not save scores.
     filter_dims : int, optional
-        In "filter" mode, number of dimemsions to keep. Defaults to 50.
+        In "filter" mode, number of dimemsions to keep. 
+    filter_thresh : float, optional
+        In "filter" mode, score threshold to use. 
     n_proc : int, optional
         Number of parallel processes to use for scoring dimensions.
         Defaults to 8; -1 will specify the number of available CPUs.

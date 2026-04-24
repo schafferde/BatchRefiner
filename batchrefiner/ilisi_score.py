@@ -11,4 +11,4 @@ def ilisi_score(dim, batch_labels, n_neighbors=15, **kwargs):
     ilisi_scores = lisi_graph_py(adata=adata_tmp, obs_key='batch', **kwargs) #n_cores=...
     ilisi = nanmedian(ilisi_scores)
     ilisi = (ilisi - 1)# / (adata.obs['batch'].nunique() - 1)
-    return ilisi
+    return -ilisi #Higher -> worse batch signal
