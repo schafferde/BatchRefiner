@@ -141,7 +141,7 @@ The complete set of parameters are very similar to `batchrefine`, with arrays sw
 ```
 
 ## Troubleshooting
-###Using iLISI
+### Using iLISI
 If you encounter an error about `GLIBC` versions when using iLISI, this is because beacuse the pre-compiled scib package used by pip was built using a new version of GLIBC. To fix this, compile scib locally by running:
 ```
 pip uninstall scib && pip install scib==1.1.7 --no-binary scib
