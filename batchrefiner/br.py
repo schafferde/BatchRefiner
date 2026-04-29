@@ -40,18 +40,8 @@ def batchrefine(embed, batch_labels, mode="scale", metric="r2", keep_scores=Fals
         or (cells, filter_dims) in "filter" mode.
     If keep_scores is True, a tuple of modified embeddings and an ndarray of scores with shape (dimensions,).
     """
-    #Validate input
+
     _, n_dims = embed.shape
-    if mode == "filter":
-        if filter_dims >= n_dims:
-            warnings.warn(
-                f"Requested filtered dimensions {filter_dims} match or exceed the number of inital dimensions {n_dims}.",
-                RuntimeWarning,
-            )
-            return embed
-    elif mode != "scale":
-        raise ValueError(f"Invalid mode {mode} specified. Supported modes are 'scale' or 'filter'.")
-    
     #set up scoring
     if callable(metric):
         #Using user-supplied benchmarking function.
@@ -93,13 +83,21 @@ def batchrefine(embed, batch_labels, mode="scale", metric="r2", keep_scores=Fals
         result = embed * scores
 
     elif mode == "filter":
+        columns = np.ones(n_dims)
         if filter_dims is not None:
             try:
                 filter_dims = int(filter_dims)
-                #We want to keep lower-scoring dimensions
-                columns = np.argpartition(scores, filter_dims)[:filter_dims]
+                if filter_dims < 0 or filter_dims >= n_dims:
+                    warnings.warn(
+                        f"Requested filtered dimensions {filter_dims} is negative, or matches or exceeds the number of initial dimensions {n_dims}.",
+                        UserWarning, stacklevel=2
+                    )
+                else:
+                     #We want to keep lower-scoring dimensions
+                     columns = np.argpartition(scores, filter_dims)[:filter_dims]
             except (ValueError, TypeError):
                 warnings.warn(f"Unable to interpret {filter_dims} as an integer number of columns", UserWarning, stacklevel=2)
+            
         elif filter_thresh is not None:
             try:
                 filter_thresh = float(filter_dims)
@@ -120,6 +118,7 @@ def batchrefine(embed, batch_labels, mode="scale", metric="r2", keep_scores=Fals
         result = embed - (scores * category_means)
 
     else:
+        #We can still return scores & unmodified embedding in this case
         warnings.warn(f"Unrecognized mode: {mode}", UserWarning, stacklevel=2)
         result = embed
     
