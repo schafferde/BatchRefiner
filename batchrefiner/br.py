@@ -64,6 +64,10 @@ def batchrefine(embed, batch_labels, mode="scale", metric="r2", keep_scores=Fals
         score_fn = ilisi_score
     else:
         raise ValueError(f"Invalid metric {metric} specified. Supported modes are 'r2', 'ilisi', or a user-provided function.")
+
+    #Avoid any label-mispatch issues for iLISI, which creates new AnnDatas
+    if isinstance(batch_labels, pd.Series):
+        batch_labels = batch_labels.values
         
     partial_score = partial(score_fn, batch_labels=batch_labels, **kwargs)
     dimensions = [embed[:,i].reshape(-1,1) for i in range(n_dims)]
