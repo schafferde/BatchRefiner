@@ -26,7 +26,7 @@ dependencies = [
 	"anndata>=0.7.2",
     "scanpy>=1.5",
     "scib==1.1.7",
-    "multiprocess>=0.70.1"
+    "pandas>=2.0.0"
 ]
 
 [project.urls]
