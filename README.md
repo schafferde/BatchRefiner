@@ -39,7 +39,9 @@ embed = ... #shape: (cells, dimensions)
 batch_labels = ... #shape: (cells, )
 
 #Run BatchRefiner
-scaled_pca = batchrefine(embed, batch_labels, mode="scale", metric="r2")
+#Running scaling, using batch R^2 with 8 processes. The R^2 calculation has some internal parallelization, so a low n_proc is suggested.
+scaled_pca = batchrefine(embed, batch_labels, mode="scale", metric="r2", n_proc=8)
+#Running filtering, using iLISI with (# of CPUs) processes
 filtered_ilisi = batchrefine(embed, batch_labels, mode="filter", metric="ilisi", n_proc=-1)
 ```
 The docstring provides all options, including parallelism (``n_proc``), custom scoring functions (``metric=callable``), and saving scores (``keep_scores``)
@@ -142,7 +144,7 @@ The complete set of parameters are very similar to `batchrefine`, with arrays sw
 
 ## Troubleshooting
 ### Using iLISI
-If you encounter an error about `GLIBC` versions when using iLISI, this is because beacuse the pre-compiled scib package used by pip was built using a new version of GLIBC. To fix this, compile scib locally by running:
+If you encounter an error about `GLIBC` versions when using iLISI, this is because beacuse the pre-compiled scib package used by pip was built using a newer version of GLIBC than the version on your computer. To fix this, compile scib locally by running:
 ```
 pip uninstall scib && pip install scib==1.1.7 --no-binary scib
 ```
@@ -151,7 +153,7 @@ If you encounter the following error:
 ```
 AssertionError: daemonic processes are not allowed to have children
 ```
-This is likely because both `n_proc` (number of processes used by BatchRefiner) and `n_cores` (number of processes used internally by scib's LISI) are greater than one. Unfortunately, parallelism is only supported at one level, so one of those arguments must be 1 (their default). It is suggested to set `n_proc=-1` and `n_cores=1` for a higher level of parallelism. 
+This is likely because both `n_proc` (number of processes used by BatchRefiner) and `n_cores` (number of processes used internally by scib's LISI) are greater than one. Unfortunately, parallelism is only supported at one level for iLISI, so one of those arguments must be 1 (their default). For better performance, it is suggested to set `n_proc=-1` and `n_cores=1`, versus setting `n_proc=1` and `n_cores=(# of CPUs)`. 
 
 ## References
 Schäffer, D. E, Kang, H., Aksu, E. D., Edelman, D., Berger, B.: Significantly enhanced batch integration of scRNA-seq embeddings. *In preparation.*
