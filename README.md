@@ -156,7 +156,7 @@ AssertionError: daemonic processes are not allowed to have children
 This is likely because both `n_proc` (number of processes used by BatchRefiner) and `n_cores` (number of processes used internally by scib's LISI) are greater than one. Unfortunately, parallelism is only supported at one level for iLISI, so one of those arguments must be 1 (their default). For better performance, it is suggested to set `n_proc=-1` and `n_cores=1`, versus setting `n_proc=1` and `n_cores=(# of CPUs)`. 
 
 ## References
-Schäffer, D. E, Kang, H., Aksu, E. D., Edelman, D., Berger, B.: Ensemble learning significantly improves batch integration of scRNA-seq cell embeddings. *In preparation.*
+Schäffer, D. E, Kang, H., Aksu, E. D., Edelman, D., Berger, B.: Ensemble refinement significantly enhances batch integration of scRNA-seq cell embeddings. *In preparation.*
 
 Hie, B.L., Kim, S., Rando, T.A., Bryson, B., Berger, B.: Scanorama: integrating large and diverse single-cell
 transcriptomic datasets. *Nat. Protoc.* **19**(8), 2283–2297 (Aug 2024)
